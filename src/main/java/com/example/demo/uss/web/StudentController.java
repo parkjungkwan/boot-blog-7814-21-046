@@ -47,9 +47,8 @@ public class StudentController {
     private final Box<String> box;
 
     @PostMapping("/save")
-    public String save(@RequestBody Student student) {
-        studentRepository.save(student);
-        return "redirect:/login";
+    public ResponseEntity<Student> save(@RequestBody Student student) {
+        return ResponseEntity.ok(studentRepository.save(student));
     }
     @GetMapping("/count")
     public long count() {
@@ -66,17 +65,23 @@ public class StudentController {
                         .orElse(0)).isPresent())
                 ? ResponseEntity.ok().build()
                 : ResponseEntity.notFound().build();
-
     }
     @GetMapping("/findAll/{pageNum}")
     public Page<Student> findAll(@PathVariable String pageNum) {
         Pageable pageable = PageRequest.of(optInteger(pageNum).orElse(1) -1, student.getPageSize());
         return studentRepository.findAll(pageable);
     }
-    @DeleteMapping("/delete")
-    public Messenger delete(@RequestBody Student student){
-        studentRepository.delete(student);
-        return Messenger.SUCCESS;
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<Student> delete(
+            @PathVariable String id,
+            @RequestBody Student student){
+        if(studentRepository
+                .findById(optInteger(id).orElse(0)).isPresent()){
+                studentRepository.delete(student);
+                return ResponseEntity.ok().build();
+        }else {
+            return ResponseEntity.notFound().build();
+        }
     }
     @GetMapping("/findByStudentsOrderByStuNumDesc/{pageNum}")
     public Page<Student> findByStudentsOrderByStuNumDesc(@PathVariable String pageNum){
@@ -84,22 +89,25 @@ public class StudentController {
         return studentRepository.findByStudentsOrderByStuNumDesc(pageable);
     }
 
-    @PostMapping("/login")
-    public Map<?,?> login(@RequestBody Student s){
+    @PostMapping("/login/{id}")
+    public Map<?,?> login(@PathVariable String id,
+            @RequestBody Student s){
         var map = new HashMap<>();
-        // Optional<Student> result = studentRepository.findById(s.getStuNum());
-        Optional<Student> result = null;
-        map.put("message", result!=null?"SUCCESS":"FAILURE");
-        map.put("sessionUser", result);
+        Optional<Student> result = studentRepository.findById(optInteger(id).orElse(0));
+        if(result.isPresent()){
+            map.put("message", "SUCCESS");
+            map.put("sessionUser", result);
+        }else{
+            map.put("message", "FAILURE");
+        }
         return map;
     }
 
     @GetMapping("/list/{pageSize}/{pageNum}")
     public Map<?,?> list(@PathVariable String pageSize, 
     					@PathVariable String pageNum){
-    	logger.info("Students List Execute ...");
     	var map = new HashMap<String,String>();
-    	map.put("TOTAL_COUNT", Sql.TOTAL_COUNT.toString() + Table.STUDENTS);	
+    	map.put("count", optLongToString(studentRepository.count()).orElse("0"));
     	var page = new Pagination(
 				Table.STUDENTS.toString(),
                 optInteger(pageSize).orElse(20),

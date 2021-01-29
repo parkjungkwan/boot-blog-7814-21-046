@@ -21,10 +21,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ManagerController {
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
-    
-    @Autowired ManagerService managerService;
-    @Autowired
-    ManagerRepository managerRepository;
+    private final ManagerService managerService;
+    private final ManagerRepository managerRepository;
 
     @PostMapping("/save")
     public Messenger save(@RequestBody Manager manager) {
