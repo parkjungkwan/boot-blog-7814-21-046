@@ -12,13 +12,15 @@ import com.example.demo.sym.service.TeacherService;
 import com.example.demo.uss.service.Student;
 import com.example.demo.uss.service.StudentRepository;
 import com.example.demo.uss.service.StudentService;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.context.properties.ConfigurationProperties;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -26,29 +28,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static com.example.demo.cmm.utl.Util.integer;
-import static com.example.demo.cmm.utl.Util.string;
+import static com.example.demo.cmm.utl.Util.*;
 
 @RestController
 @RequestMapping("/students")
 @CrossOrigin(origins="*")
-@ConfigurationProperties(prefix="student.list")
+@RequiredArgsConstructor
 public class StudentController {
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
-    @Autowired StudentService studentService;
-    @Autowired GradeService gradeService;
-    @Autowired
-    StudentRepository studentRepository;
-    @Autowired SubjectService subjectService;
-    @Autowired TeacherService teacherService;
-    @Autowired ManagerService managerService;
-    @Autowired Pagination page;
-    @Autowired Box<String> bx;
-
-    private int pageSize = 20;
-    public void setPageSize(int pageSize){
-        this.pageSize = pageSize;
-    }
+    private final GradeService gradeService;
+    private final StudentService studentService;
+    private final StudentRepository studentRepository;
+    private final SubjectService subjectService;
+    private final TeacherService teacherService;
+    private final ManagerService managerService;
+    private final Student student;
+    private final Pagination page;
+    private final Box<String> box;
 
     @PostMapping("/save")
     public String save(@RequestBody Student student) {
@@ -61,15 +57,20 @@ public class StudentController {
     }
     @GetMapping("/existsById/{id}")
     public boolean existsById(@PathVariable String id) {
-        return studentRepository.existsById(integer.apply(id));
+        return studentRepository.existsById(optInteger(id).orElse(0));
     }
     @GetMapping("/findById/{id}")
-    public Optional<Student> findById(@PathVariable String id) {
-        return studentRepository.findById(integer.apply(id));
+    public ResponseEntity<Student> findById(@PathVariable String id) {
+        return (studentRepository
+                .findById(optInteger(id)
+                        .orElse(0)).isPresent())
+                ? ResponseEntity.ok().build()
+                : ResponseEntity.notFound().build();
+
     }
     @GetMapping("/findAll/{pageNum}")
     public Page<Student> findAll(@PathVariable String pageNum) {
-        Pageable pageable = PageRequest.of(integer.apply(pageNum), pageSize);
+        Pageable pageable = PageRequest.of(optInteger(pageNum).orElse(1) -1, student.getPageSize());
         return studentRepository.findAll(pageable);
     }
     @DeleteMapping("/delete")
@@ -79,7 +80,7 @@ public class StudentController {
     }
     @GetMapping("/findByStudentsOrderByStuNumDesc/{pageNum}")
     public Page<Student> findByStudentsOrderByStuNumDesc(@PathVariable String pageNum){
-        Pageable pageable = PageRequest.of(integer.apply(pageNum), pageSize);
+        Pageable pageable = PageRequest.of(optInteger(pageNum).orElse(1) -1, student.getPageSize());
         return studentRepository.findByStudentsOrderByStuNumDesc(pageable);
     }
 
@@ -100,9 +101,9 @@ public class StudentController {
     	var map = new HashMap<String,String>();
     	map.put("TOTAL_COUNT", Sql.TOTAL_COUNT.toString() + Table.STUDENTS);	
     	var page = new Pagination(
-				Table.STUDENTS.toString(), 
-				integer.apply(pageSize),
-				integer.apply(pageNum), 100)
+				Table.STUDENTS.toString(),
+                optInteger(pageSize).orElse(20),
+                optInteger(pageNum).orElse(1) -1, 100)
 				;
     	var map2 = new HashMap<String, Object>();
     	map2.put("list", studentService.list(page));
@@ -123,7 +124,13 @@ public class StudentController {
         return Messenger.SUCCESS;
     }
 
-    
+    @PatchMapping("/patch/{id}")
+    public Messenger patch(@PathVariable String id,
+                           @RequestBody Student student){
+        Student s = studentRepository.findById(optInteger(id).orElse(0)).orElse(student);
+        return Messenger.SUCCESS;
+    }
+
     @GetMapping("/insert-many/{count}")
     public String insertMany(@PathVariable String count) {
     	logger.info(String.format("Insert %s Students ...",count));
